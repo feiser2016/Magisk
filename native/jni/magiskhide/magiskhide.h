@@ -10,7 +10,7 @@
 #include <map>
 #include <set>
 
-#include "daemon.h"
+#include <daemon.h>
 
 #define SIGTERMTHRD SIGUSR1
 
@@ -18,8 +18,6 @@
 #define SAFETYNET_PROCESS    "com.google.android.gms.unstable"
 #define SAFETYNET_PKG        "com.google.android.gms"
 #define MICROG_SAFETYNET     "org.microg.gms.droidguard"
-
-#define WEVENT(s) (((s) & 0xffff0000) >> 16)
 
 // CLI entries
 void launch_magiskhide(int client);
@@ -29,15 +27,14 @@ int rm_list(int client);
 void ls_list(int client);
 
 // Process monitoring
-void *update_uid_map(void * p = nullptr);
 void proc_monitor();
+void update_uid_map();
 
 // Utility functions
 void manage_selinux();
 void clean_magisk_props();
 void crawl_procfs(const std::function<bool (int)> &fn);
 void crawl_procfs(DIR *dir, const std::function<bool (int)> &fn);
-bool proc_name_match(int pid, const char *name);
 
 extern bool hide_enabled;
 extern pthread_mutex_t monitor_lock;

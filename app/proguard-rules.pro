@@ -29,6 +29,9 @@
   void onResponse(int);
 }
 
+# DelegateWorker
+-keep,allowobfuscation class * extends com.topjohnwu.magisk.model.worker.DelegateWorker
+
 # BootSigner
 -keepclassmembers class com.topjohnwu.signing.BootSigner { *; }
 
@@ -46,4 +49,8 @@
 # Excessive obfuscation
 -repackageclasses 'a'
 -allowaccessmodification
--optimizationpasses 6
+
+# QOL
+-dontnote **
+-dontwarn com.caverock.androidsvg.**
+-dontwarn ru.noties.markwon.**

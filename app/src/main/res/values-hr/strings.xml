@@ -75,10 +75,8 @@
     <string name="hide_manager_title">Skrivanje Magisk Manager aplikacije…</string>
     <string name="hide_manager_fail_toast">Skrivanje Magisk Manager nije uspjelo</string>
     <string name="download_zip_only">Preuzmi samo zip</string>
-    <string name="patch_boot_file">Zakrpa datoteke za podizanje sustava</string>
     <string name="direct_install">Izravna instalacija (preporuča se)</string>
     <string name="select_method">Odaberite metodu</string>
-    <string name="boot_file_patch_msg">Odaberite standardnu datoteku za podizanje sustava u .img ili .img.tar formatu</string>
     <string name="complete_uninstall">Potpuna deinstalacija</string>
     <string name="restore_done">Obnova je dovršena!</string>
     <string name="restore_fail">Stock backup does not exist!</string>
@@ -102,8 +100,6 @@
     <string name="settings_update_channel_title">Kanal ažuriranja</string>
     <string name="settings_update_stable">Stabilno</string>
     <string name="settings_update_beta">Beta</string>
-    <string name="settings_boot_format_title">Izlazni format datoteke za podizanje sustava nakon zakrpe</string>
-    <string name="settings_boot_format_summary">Odaberite izlazni format datoteke za podizanje sustava nakon zakrpe.\nOdaberite .img da biste aplicirali putem brzog pokretanja(fastboota)/preuzimanja(downloada); odaberite .img.tar da biste aplicirali putem ODIN-a.</string>
 
     <string name="settings_core_only_title">Samo Magisk Core način rada</string>
     <string name="settings_core_only_summary">Omogućite samo osnovne značajke, svi se moduli neće učitati. MagiskSU i MagiskHide će i dalje biti omogućeni</string>

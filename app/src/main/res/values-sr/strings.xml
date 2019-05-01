@@ -77,10 +77,8 @@
     <string name="hide_manager_title">Сакривам Магиск Менаџер…</string>
     <string name="hide_manager_fail_toast">Скривање Магиск Менаџера неуспешно…</string>
     <string name="download_zip_only">Преузми само Зип</string>
-    <string name="patch_boot_file">Закрпи фајл слике покретања</string>
     <string name="direct_install">Директна Инсталација (Препоручено)</string>
     <string name="select_method">Изабери Методу</string>
-    <string name="boot_file_patch_msg">Изабери испис фабричког фајла слике покретања у .img или img.tar формату</string>
     <string name="complete_uninstall">Комплетна Унинсталација</string>
     <string name="restore_done">Повратак успешан!</string>
     <string name="restore_fail">Фабрички бекап не постоји!</string>
@@ -106,8 +104,6 @@
     <string name="settings_update_beta">Бета</string>
     <string name="settings_update_custom">По наруџби</string>
     <string name="settings_update_custom_msg">Унеси наруџбени УРЛ</string>
-    <string name="settings_boot_format_title">Закрпљено Покретање Излазни Формат</string>
-    <string name="settings_boot_format_summary">Изабери формат излазних закрпљених слика покретања.\nИзаберите .img ако флешујете преко fastboot/download режима; Изаберите .img.tar ако флешујете уз ОДИН.</string>
     <string name="settings_core_only_title">Магиск Основни Режим</string>
     <string name="settings_core_only_summary">Омогућава само основне карактеристике, сви модули неће бити учитани. МагискСК и МагискСакриј ће бити омогућени</string>
     <string name="settings_magiskhide_summary">Сакриј Магиск од разних детекција</string>

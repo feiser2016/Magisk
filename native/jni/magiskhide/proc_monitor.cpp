@@ -20,6 +20,7 @@
 #include <sys/wait.h>
 #include <sys/mount.h>
 #include <vector>
+#include <bitset>
 
 #include <magisk.h>
 #include <utils.h>
@@ -27,8 +28,6 @@
 #include "magiskhide.h"
 
 using namespace std;
-
-extern char *system_block, *vendor_block, *data_block;
 
 static int inotify_fd = -1;
 
@@ -46,8 +45,8 @@ static map<int, vector<string_view>> uid_proc_map;  /* uid -> list of process */
 pthread_mutex_t monitor_lock;
 
 #define PID_MAX 32768
-static vector<bool> attaches(PID_MAX);  /* true if pid is monitored */
-static vector<bool> detaches(PID_MAX);  /* true if tid should be detached */
+static bitset<PID_MAX> attaches;  /* true if pid is monitored */
+static bitset<PID_MAX> detaches;  /* true if tid should be detached */
 
 /********
  * Utils
@@ -135,18 +134,21 @@ static bool parse_packages_xml(string_view s) {
 	return true;
 }
 
+void update_uid_map() {
+	MutexGuard lock(monitor_lock);
+	uid_proc_map.clear();
+	file_readline("/data/system/packages.xml", parse_packages_xml, true);
+}
+
 static void check_zygote() {
 	int min_zyg = 1;
 	if (access("/system/bin/app_process64", R_OK) == 0)
 		min_zyg = 2;
-	for (bool first = true; zygote_map.size() < min_zyg; first = false) {
-		if (!first)
-			usleep(10000);
+	for (;;) {
 		crawl_procfs([](int pid) -> bool {
 			char buf[512];
 			snprintf(buf, sizeof(buf), "/proc/%d/cmdline", pid);
-			FILE *f = fopen(buf, "re");
-			if (f) {
+			if (FILE *f = fopen(buf, "re"); f) {
 				fgets(buf, sizeof(buf), f);
 				if (strncmp(buf, "zygote", 6) == 0 && parse_ppid(pid) == 1)
 					new_zygote(pid);
@@ -154,14 +156,41 @@ static void check_zygote() {
 			}
 			return true;
 		});
+		if (zygote_map.size() >= min_zyg)
+			break;
+		usleep(10000);
 	}
 }
 
-void *update_uid_map(void*) {
-	MutexGuard lock(monitor_lock);
-	uid_proc_map.clear();
-	file_readline("/data/system/packages.xml", parse_packages_xml, true);
-	return nullptr;
+#define APP_PROC "/system/bin/app_process"
+
+static void setup_inotify() {
+	inotify_fd = xinotify_init1(IN_CLOEXEC);
+	if (inotify_fd < 0)
+		term_thread();
+
+	// Setup inotify asynchronous I/O
+	fcntl(inotify_fd, F_SETFL, O_ASYNC);
+	struct f_owner_ex ex = {
+			.type = F_OWNER_TID,
+			.pid = gettid()
+	};
+	fcntl(inotify_fd, F_SETOWN_EX, &ex);
+
+	// Monitor packages.xml
+	inotify_add_watch(inotify_fd, "/data/system", IN_CLOSE_WRITE);
+
+	// Monitor app_process
+	if (access(APP_PROC "32", F_OK) == 0) {
+		inotify_add_watch(inotify_fd, APP_PROC "32", IN_ACCESS);
+		if (access(APP_PROC "64", F_OK) == 0)
+			inotify_add_watch(inotify_fd, APP_PROC "64", IN_ACCESS);
+	} else {
+		inotify_add_watch(inotify_fd, APP_PROC, IN_ACCESS);
+	}
+
+	// First find existing zygotes
+	check_zygote();
 }
 
 /*************************
@@ -200,11 +229,9 @@ static void hide_daemon(int pid) {
 		lazy_unmount(s.data());
 	targets.clear();
 
-	// Unmount everything under /system, /vendor, and data mounts
+	// Unmount all Magisk created mounts
 	file_readline("/proc/self/mounts", [&](string_view s) -> bool {
-		if ((str_contains(s, " /system/") || str_contains(s, " /vendor/")) &&
-			(str_contains(s, system_block) || str_contains(s, vendor_block) ||
-			 str_contains(s, data_block))) {
+		if (str_contains(s, BLOCKDIR)) {
 			char *path = (char *) s.data();
 			// Skip first token
 			strtok_r(nullptr, " ", &path);
@@ -236,7 +263,10 @@ static void inotify_event(int) {
 	read(inotify_fd, buf, sizeof(buf));
 	if ((event->mask & IN_CLOSE_WRITE) && strcmp(event->name, "packages.xml") == 0) {
 		LOGD("proc_monitor: /data/system/packages.xml updated\n");
-		new_daemon_thread(update_uid_map);
+		uid_proc_map.clear();
+		file_readline("/data/system/packages.xml", parse_packages_xml, true);
+	} else if (event->mask & IN_ACCESS) {
+		check_zygote();
 	}
 }
 
@@ -246,8 +276,8 @@ static void term_thread(int) {
 	uid_proc_map.clear();
 	zygote_map.clear();
 	hide_set.clear();
-	std::fill(attaches.begin(), attaches.end(), false);
-	std::fill(detaches.begin(), detaches.end(), false);
+	attaches.reset();
+	detaches.reset();
 	// Misc
 	hide_enabled = false;
 	pthread_mutex_destroy(&monitor_lock);
@@ -365,12 +395,10 @@ static void new_zygote(int pid) {
 	xptrace(PTRACE_CONT, pid);
 }
 
+#define WEVENT(s) (((s) & 0xffff0000) >> 16)
 #define DETACH_AND_CONT { detach = true; continue; }
-void proc_monitor() {
-	inotify_fd = xinotify_init1(IN_CLOEXEC);
-	if (inotify_fd < 0)
-		term_thread();
 
+void proc_monitor() {
 	// Unblock some signals
 	sigset_t block_set;
 	sigemptyset(&block_set);
@@ -384,19 +412,7 @@ void proc_monitor() {
 	act.sa_handler = inotify_event;
 	sigaction(SIGIO, &act, nullptr);
 
-	// Setup inotify asynchronous I/O
-	fcntl(inotify_fd, F_SETFL, O_ASYNC);
-	struct f_owner_ex ex = {
-		.type = F_OWNER_TID,
-		.pid = gettid()
-	};
-	fcntl(inotify_fd, F_SETOWN_EX, &ex);
-
-	// Start monitoring packages.xml
-	inotify_add_watch(inotify_fd, "/data/system", IN_CLOSE_WRITE);
-
-	// First find existing zygotes
-	check_zygote();
+	setup_inotify();
 
 	int status;
 

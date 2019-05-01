@@ -28,9 +28,7 @@ using namespace std;
 
 static char buf[PATH_MAX], buf2[PATH_MAX];
 static vector<string> module_list;
-static bool seperate_vendor;
-
-char *system_block, *vendor_block, *data_block;
+static bool no_secure_dir = false;
 
 static int bind_mount(const char *from, const char *to, bool log = true);
 extern void auto_start_magiskhide();
@@ -77,7 +75,8 @@ private:
 		this->parent = parent;
 		this->module = module;
 	}
-	bool is_vendor();
+	bool is_special();
+	bool is_root();
 	string get_path();
 	void insert(node_entry *&);
 	void clone_skeleton();
@@ -89,8 +88,12 @@ node_entry::~node_entry() {
 		delete node;
 }
 
-bool node_entry::is_vendor() {
+bool node_entry::is_special() {
 	return parent ? (parent->parent ? false : name == "vendor") : false;
+}
+
+bool node_entry::is_root() {
+	return parent ? (parent->parent ? false : name == "vendor") : true;
 }
 
 string node_entry::get_path() {
@@ -141,35 +144,45 @@ void node_entry::create_module_tree(const char *module) {
 
 		// buf = real path, buf2 = module path
 		snprintf(buf, PATH_MAX, "%s/%s", full_path.c_str(), entry->d_name);
-		int eo2 = snprintf(buf2, PATH_MAX, MODULEROOT "/%s%s/%s",
+		int eof = snprintf(buf2, PATH_MAX, MODULEROOT "/%s%s/%s",
 				module, full_path.c_str(), entry->d_name);
 
 		/*
-		 * Clone the parent in the following condition:
-		 * 1. File in module is a symlink
-		 * 2. Target file do not exist
-		 * 3. Target file is a symlink (exclude /system/vendor)
+		 * Clone current node directory in the following condition:
+		 * 1. We are not a root node
+		 * 2. Target does not exist or
+		 * 3. Module file is a symlink or
+		 * 4. Target file is a symlink (exclude special nodes)
 		 */
 		bool clone = false;
 		if (IS_LNK(node) || access(buf, F_OK) == -1) {
 			clone = true;
-		} else if (!node->is_vendor()) {
+		} else if (!node->is_special()) {
 			struct stat s;
-			xstat(buf, &s);
+			xlstat(buf, &s);
 			if (S_ISLNK(s.st_mode))
 				clone = true;
+		}
+		if (clone && is_root()) {
+			// Remove both the new node and file that requires cloning ourselves
+			rm_rf(buf2);
+			delete node;
+			continue;
 		}
 
 		if (clone) {
 			// Mark self as a skeleton
 			status |= IS_SKEL;  /* This will not overwrite if parent is module */
 			node->status = IS_MODULE;
+		} else if (node->is_special()) {
+			// Special nodes will be pulled out as root nodes later
+			node->status = IS_INTER;
 		} else {
 			// Clone attributes from real path
 			clone_attr(buf, buf2);
 			if (IS_DIR(node)) {
 				// Check if marked as replace
-				strcpy(buf2 + eo2, "/.replace");
+				strcpy(buf2 + eof, "/.replace");
 				if (access(buf2, F_OK) == 0) {
 					// Replace everything, mark as leaf
 					node->status = IS_MODULE;
@@ -194,7 +207,7 @@ void node_entry::create_module_tree(const char *module) {
 void node_entry::clone_skeleton() {
 	DIR *dir;
 	struct dirent *entry;
-	struct node_entry *dummy;
+	node_entry *dummy;
 
 	// Clone the structure
 	auto full_path = get_path();
@@ -228,14 +241,7 @@ void node_entry::clone_skeleton() {
 			close(creat(buf, 0644));
 		// Links will be handled later
 
-		if (child->is_vendor()) {
-			if (seperate_vendor) {
-				cp_afc(MIRRDIR "/system/vendor", "/system/vendor");
-				VLOGI("copy_link ", "/system/vendor", MIRRDIR "/system/vendor");
-			}
-			// Skip
-			continue;
-		} else if (child->status & IS_MODULE) {
+		if (child->status & IS_MODULE) {
 			// Mount from module file to dummy file
 			snprintf(buf2, PATH_MAX, "%s/%s%s/%s", MODULEMNT,
 					 child->module, full_path.c_str(), child->name.c_str());
@@ -273,58 +279,20 @@ void node_entry::magic_mount() {
 		for (auto &child : children)
 			child->magic_mount();
 	}
-	// The only thing goes here should be placeholder nodes
-	// There should be no dummies, so don't need to handle it here
 }
 
 node_entry *node_entry::extract(const char *name) {
 	node_entry *node = nullptr;
-	// Extract the node out and swap with placeholder
-	for (auto &child : children) {
-		if (child->name == name) {
-			node = child;
-			child = new node_entry(name);
-			child->parent = node->parent;
+	// Extract the node out of the tree
+	for (auto it = children.begin(); it != children.end(); ++it) {
+		if ((*it)->name == name) {
+			node = *it;
 			node->parent = nullptr;
+			children.erase(it);
 			break;
 		}
 	}
 	return node;
-}
-
-/****************
- * Simple Mount *
- ****************/
-
-static void simple_mount(const char *path) {
-	DIR *dir;
-	struct dirent *entry;
-
-	snprintf(buf, PATH_MAX, "%s%s", SIMPLEMOUNT, path);
-	if (!(dir = opendir(buf)))
-		return;
-
-	while ((entry = xreaddir(dir))) {
-		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-			continue;
-		// Target file path
-		snprintf(buf2, PATH_MAX, "%s/%s", path, entry->d_name);
-		// Only mount existing file
-		if (access(buf2, F_OK) == -1)
-			continue;
-		if (entry->d_type == DT_DIR) {
-			simple_mount(string(buf2).c_str());
-		} else if (entry->d_type == DT_REG) {
-			// Actual file path
-			snprintf(buf, PATH_MAX, "%s%s", SIMPLEMOUNT, buf2);
-			// Clone all attributes
-			clone_attr(buf2, buf);
-			// Finally, mount the file
-			bind_mount(buf, buf2);
-		}
-	}
-
-	closedir(dir);
 }
 
 /*****************
@@ -337,13 +305,27 @@ static int bind_mount(const char *from, const char *to, bool log) {
 	return ret;
 }
 
+#define MIRRMNT(part)   MIRRDIR "/" #part
+#define PARTBLK(part)   BLOCKDIR "/" #part
+
+#define mount_mirror(part, flag) { \
+	sscanf(line.data(), "%s %*s %s", buf, buf2); \
+	xstat(buf, &st); \
+	mknod(PARTBLK(part), S_IFBLK | 0600, st.st_rdev); \
+	xmkdir(MIRRMNT(part), 0755); \
+	xmount(PARTBLK(part), MIRRMNT(part), buf2, flag, nullptr); \
+	VLOGI("mount", PARTBLK(part), MIRRMNT(part)); \
+}
+
 static bool magisk_env() {
 	LOGI("* Initializing Magisk environment\n");
 
 	// Alternative binaries paths
-	const char *alt_bin[] = { "/cache/data_adb/magisk", "/data/magisk",
-							  "/data/data/com.topjohnwu.magisk/install",
-							  "/data/user_de/0/com.topjohnwu.magisk/install" };
+	constexpr const char *alt_bin[] = {
+		"/cache/data_adb/magisk", "/data/magisk",
+		"/data/data/com.topjohnwu.magisk/install",
+		"/data/user_de/0/com.topjohnwu.magisk/install"
+	};
 	for (auto &alt : alt_bin) {
 		struct stat st;
 		if (lstat(alt, &st) != -1) {
@@ -363,46 +345,37 @@ static bool magisk_env() {
 	unlink("/data/magisk.img");
 	unlink("/data/magisk_debug.log");
 
-	// Legacy support
+	// Backwards compatibility
 	symlink(MAGISKTMP, "/sbin/.core");
 	symlink(MODULEMNT, MAGISKTMP "/img");
 
-	// Create directories in tmpfs overlay
-	xmkdirs(MIRRDIR "/system", 0755);
-	xmkdir(MIRRDIR "/data", 0755);
+	// Directories in tmpfs overlay
+	xmkdir(MIRRDIR, 0);
+	xmkdir(BLOCKDIR, 0);
 	xmkdir(BBPATH, 0755);
 	xmkdir(MODULEMNT, 0755);
 
-	// /data/adb directories
+	// Directories in /data/adb
+	xmkdir(DATABIN, 0755);
 	xmkdir(MODULEROOT, 0755);
 	xmkdir(SECURE_DIR "/post-fs-data.d", 0755);
 	xmkdir(SECURE_DIR "/service.d", 0755);
 
 	LOGI("* Mounting mirrors");
 	bool system_as_root = false;
+	struct stat st;
 	file_readline("/proc/mounts", [&](string_view line) -> bool {
 		if (str_contains(line, " /system_root ")) {
-			bind_mount("/system_root/system", MIRRDIR "/system");
-			sscanf(line.data(), "%s", buf);
-			system_block = strdup(buf);
+			mount_mirror(system_root, MS_RDONLY);
+			xsymlink(MIRRMNT(system_root) "/system", MIRRMNT(system));
+			VLOGI("link", MIRRMNT(system_root) "/system", MIRRMNT(system));
 			system_as_root = true;
 		} else if (!system_as_root && str_contains(line, " /system ")) {
-			sscanf(line.data(), "%s %*s %s", buf, buf2);
-			system_block = strdup(buf);
-			xmount(system_block, MIRRDIR "/system", buf2, MS_RDONLY, nullptr);
-			VLOGI("mount", system_block, MIRRDIR "/system");
+			mount_mirror(system, MS_RDONLY);
 		} else if (str_contains(line, " /vendor ")) {
-			seperate_vendor = true;
-			sscanf(line.data(), "%s %*s %s", buf, buf2);
-			vendor_block = strdup(buf);
-			xmkdir(MIRRDIR "/vendor", 0755);
-			xmount(vendor_block, MIRRDIR "/vendor", buf2, MS_RDONLY, nullptr);
-			VLOGI("mount", vendor_block, MIRRDIR "/vendor");
+			mount_mirror(vendor, MS_RDONLY);
 		} else if (str_contains(line, " /data ")) {
-			sscanf(line.data(), "%s %*s %s", buf, buf2);
-			data_block = strdup(buf);
-			xmount(data_block, MIRRDIR "/data", buf2, 0, nullptr);
-			VLOGI("mount", data_block, MIRRDIR "/data");
+			mount_mirror(data, 0);
 		} else if (SDK_INT >= 24 &&
 		str_contains(line, " /proc ") && !str_contains(line, "hidepid=2")) {
 			// Enforce hidepid
@@ -410,17 +383,10 @@ static bool magisk_env() {
 		}
 		return true;
 	});
-	if (!seperate_vendor) {
-		xsymlink(MIRRDIR "/system/vendor", MIRRDIR "/vendor");
-		VLOGI("link", MIRRDIR "/system/vendor", MIRRDIR "/vendor");
+	if (access(MIRRMNT(vendor), F_OK) != 0) {
+		xsymlink(MIRRMNT(system) "/vendor", MIRRMNT(vendor));
+		VLOGI("link", MIRRMNT(system) "/vendor", MIRRMNT(vendor));
 	}
-
-	if (access(DATABIN "/busybox", X_OK) == -1)
-		return false;
-	LOGI("* Setting up internal busybox");
-	close(xopen(BBPATH "/busybox", O_RDONLY | O_CREAT | O_CLOEXEC));
-	bind_mount(DATABIN "/busybox", BBPATH "/busybox", false);
-	exec_command_sync(BBPATH "/busybox", "--install", "-s", BBPATH);
 
 	// Disable/remove magiskhide, resetprop, and modules
 	if (SDK_INT < 19) {
@@ -428,6 +394,13 @@ static bool magisk_env() {
 		unlink("/sbin/resetprop");
 		unlink("/sbin/magiskhide");
 	}
+
+	if (access(DATABIN "/busybox", X_OK) == -1)
+		return false;
+	LOGI("* Setting up internal busybox");
+	cp_afc(DATABIN "/busybox", BBPATH "/busybox");
+	exec_command_sync(BBPATH "/busybox", "--install", "-s", BBPATH);
+
 	return true;
 }
 
@@ -478,6 +451,9 @@ static void collect_modules() {
 			if (access("remove", F_OK) == 0) {
 				chdir("..");
 				LOGI("%s: remove\n", entry->d_name);
+				sprintf(buf, "%s/uninstall.sh", entry->d_name);
+				if (access(buf, F_OK) == 0)
+					exec_script(buf);
 				rm_rf(entry->d_name);
 				continue;
 			}
@@ -522,20 +498,20 @@ void unlock_blocks() {
 	struct dirent *entry;
 	int fd, dev, OFF = 0;
 
-	if ((dev = xopen("/dev/block", O_RDONLY | O_CLOEXEC)) < 0)
+	if (!(dir = xopendir("/dev/block")))
 		return;
-	dir = xfdopendir(dev);
+	dev = dirfd(dir);
 
 	while((entry = readdir(dir))) {
 		if (entry->d_type == DT_BLK) {
-			if ((fd = openat(dev, entry->d_name, O_RDONLY)) < 0)
+			if ((fd = openat(dev, entry->d_name, O_RDONLY | O_CLOEXEC)) < 0)
 				continue;
-			if (ioctl(fd, BLKROSET, &OFF) == -1)
+			if (ioctl(fd, BLKROSET, &OFF) < 0)
 				PLOGE("unlock %s", entry->d_name);
 			close(fd);
 		}
 	}
-	close(dev);
+	closedir(dir);
 }
 
 static bool log_dump = false;
@@ -600,6 +576,7 @@ void post_fs_data(int client) {
 		 * do NOT proceed further. Manual creation of the folder
 		 * will cause bootloops on FBE devices. */
 		LOGE(SECURE_DIR " is not present, abort...");
+		no_secure_dir = true;
 		unblock_boot_process();
 	}
 
@@ -618,12 +595,6 @@ void post_fs_data(int client) {
 	fprintf(cf, "%d", boot_count);
 	fclose(cf);
 #endif
-
-	// No uninstaller or core-only mode
-	if (access(DISABLEFILE, F_OK) != 0) {
-		simple_mount("/system");
-		simple_mount("/vendor");
-	}
 
 	if (!magisk_env()) {
 		LOGE("* Magisk environment setup incomplete, abort\n");
@@ -655,9 +626,6 @@ void post_fs_data(int client) {
 	// Create the system root entry
 	auto sys_root = new node_entry("system", IS_INTER);
 
-	// Vendor root entry
-	node_entry *ven_root = nullptr;
-
 	bool has_modules = false;
 
 	LOGI("* Loading modules\n");
@@ -669,9 +637,9 @@ void post_fs_data(int client) {
 			LOGI("%s: loading [system.prop]\n", module);
 			load_prop_file(buf, false);
 		}
-		// Check whether enable auto_mount
-		snprintf(buf, PATH_MAX, "%s/%s/auto_mount", MODULEROOT, module);
-		if (access(buf, F_OK) == -1)
+		// Check whether skip mounting
+		snprintf(buf, PATH_MAX, "%s/%s/skip_mount", MODULEROOT, module);
+		if (access(buf, F_OK) == 0)
 			continue;
 		// Double check whether the system folder exists
 		snprintf(buf, PATH_MAX, "%s/%s/system", MODULEROOT, module);
@@ -692,17 +660,18 @@ void post_fs_data(int client) {
 	}
 
 	if (has_modules) {
-		// Pull out /system/vendor node if exist
-		ven_root = sys_root->extract("vendor");
+		// Pull out special nodes if exist
+		node_entry *special;
+		if ((special = sys_root->extract("vendor"))) {
+			special->magic_mount();
+			delete special;
+		}
 
-		// Magic!!
 		sys_root->magic_mount();
-		if (ven_root) ven_root->magic_mount();
 	}
 
 	// Cleanup memory
 	delete sys_root;
-	delete ven_root;
 
 	core_only();
 }
@@ -715,11 +684,15 @@ void late_start(int client) {
 
 	dump_logs();
 
-	if (access(SECURE_DIR, F_OK) != 0) {
+	if (no_secure_dir) {
 		// It's safe to create the folder at this point if the system didn't create it
-		xmkdir(SECURE_DIR, 0700);
+		if (access(SECURE_DIR, F_OK) != 0)
+			xmkdir(SECURE_DIR, 0700);
 		// And reboot to make proper setup possible
-		exec_command_sync("/system/bin/reboot");
+		if (RECOVERY_MODE)
+			exec_command_sync("/system/bin/reboot", "recovery");
+		else
+			exec_command_sync("/system/bin/reboot");
 	}
 
 	auto_start_magiskhide();
@@ -729,13 +702,22 @@ void late_start(int client) {
 	exec_common_script("service");
 
 	// Core only mode
-	if (access(DISABLEFILE, F_OK) == 0)
-		goto core_only;
+	if (access(DISABLEFILE, F_OK) != 0) {
+		LOGI("* Running module service scripts\n");
+		exec_module_script("service", module_list);
+	}
 
-	LOGI("* Running module service scripts\n");
-	exec_module_script("service", module_list);
+	// All boot stage done, cleanup
+	module_list.clear();
+	module_list.shrink_to_fit();
+}
 
-core_only:
+void boot_complete(int client) {
+	LOGI("** boot_complete triggered\n");
+	// ack
+	write_int(client, 0);
+	close(client);
+
 	if (access(MANAGERAPK, F_OK) == 0) {
 		// Install Magisk Manager if exists
 		rename(MANAGERAPK, "/data/magisk.apk");
@@ -750,16 +732,4 @@ core_only:
 			install_apk("/data/magisk.apk");
 		}
 	}
-
-	// All boot stage done, cleanup
-	module_list.clear();
-}
-
-void boot_complete(int client) {
-	LOGI("** boot_complete triggered\n");
-	// ack
-	write_int(client, 0);
-	close(client);
-
-	unlink(BOOTCOUNT);
 }

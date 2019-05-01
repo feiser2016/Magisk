@@ -108,8 +108,7 @@
     <string name="android_o_not_support">لا يدعم إصدار الأندرويد +8.0</string>
   <string name="auth_fail">فشل المصادقة</string>
   <string name="auth_fingerprint">مصادقة البصمة</string>
-  <string name="boot_file_patch_msg">حدد الذاكرة المؤقتة لنسخة boot الأصلية بتنسيق img. أو .img.tar</string>
-  <string name="complete_uninstall">إلغاء التثبيت بالكامل</string>
+    <string name="complete_uninstall">إلغاء التثبيت بالكامل</string>
   <string name="direct_install">تثبيت مباشر (موصى به)</string>
   <string name="disable_fingerprint">لم يتم تعيين بصمات الأصابع أو لا يوجد جهاز مدعوم</string>
   <string name="download_zip_only">تحميل ملف zip فقط</string>
@@ -134,8 +133,7 @@
   <string name="menuSaveLog">حفظ السجل</string>
   <string name="mount_namespace_mode">وضع تركيب مساحة الأسم</string>
     <string name="open_link_failed_toast">لم يتم العثور على تطبيق لفتح الرابط …</string>
-  <string name="patch_boot_file">تصحيح ملف صورة boot</string>
-  <string name="proprietary_notice">مدير Magisk هو FOSS ، والذي لا يحتوي على شفرة API الخاصة بشركة SafetyNet الخاصة بشركة Google.
+    <string name="proprietary_notice">مدير Magisk هو FOSS ، والذي لا يحتوي على شفرة API الخاصة بشركة SafetyNet الخاصة بشركة Google.
 
 هل تسمح لـ Magisk Manager بتنزيل ملحق (يحتوي على GoogleApiClient) لعمليات التحقق من SafetyNet؟ "</string>
   <string name="proprietary_title">تحميل رمز الملكية</string>
@@ -149,10 +147,7 @@
   <string name="restore_img_msg">الأستعادة …</string>
   <string name="safetyNet_api_error">خطأ SafetyNet API</string>
   <string name="select_method">حدد الطريقة</string>
-  <string name="settings_boot_format_summary">"حدد تنسيق ملف boot المصحح للإخراج.
-اختر img. للتثبيت من خلال وضع fastboot/ التحميل ؛ اختر img.tar. للتثبيت مع ODIN. "</string>
-  <string name="settings_boot_format_title">تنسيق إخراج ملف Boot المصحح</string>
-  <string name="settings_check_update_summary">التحقق من التحديثات في الخلفية بشكل دوري</string>
+    <string name="settings_check_update_summary">التحقق من التحديثات في الخلفية بشكل دوري</string>
   <string name="settings_check_update_title">تفقد التحديث</string>
   <string name="settings_hide_manager_summary">أعد حزم مدير Magisk مع اسم حزمة عشوائية</string>
   <string name="settings_hide_manager_title">إخفاء مدير Magisk</string>
@@ -171,8 +166,7 @@
   <string name="settings_update_custom">مخصص</string>
   <string name="settings_update_custom_msg">أدخل عنوان URL مخصص</string>
   <string name="settings_update_stable">مستقر</string>
-  <string name="setup_done">تم الإعداد</string>
-  <string name="setup_fail">فشل الإعداد</string>
+    <string name="setup_fail">فشل الإعداد</string>
   <string name="setup_msg">تشغيل إعداد البيئة…</string>
   <string name="setup_title">إعداد إضافي</string>
   <string name="sort_by_name">الترتيب حسب الاسم</string>

@@ -92,13 +92,11 @@
     <string name="hide_manager_fail_toast">Magisk Managerを隠せませんでした…</string>
     <string name="open_link_failed_toast">このリンクを開けるアプリがありません</string>
     <string name="download_zip_only">ZIPのみダウンロード</string>
-    <string name="patch_boot_file">Bootイメージのパッチ</string>
     <string name="direct_install">直接インストール (推奨)</string>
     <string name="install_inactive_slot">Inactive Slotにインストール (OTA後)</string>
     <string name="warning">警告</string>
     <string name="install_inactive_slot_msg">お使いのデバイスは再起動後に現在のInactive Slotで強制的に起動されます！\nこのオプションはOTAの完了後にのみ使用してください。\n続行しますか？</string>
     <string name="select_method">方法の選択</string>
-    <string name="boot_file_patch_msg">StockのBootイメージ (.img または .img.tar形式) を選択してください</string>
     <string name="complete_uninstall">完全にアンインストール</string>
     <string name="restore_img">イメージのリストア</string>
     <string name="restore_img_msg">リストア中…</string>
@@ -106,7 +104,6 @@
     <string name="restore_fail">Stockのバックアップがありません！</string>
     <string name="proprietary_title">プロプライエタリコードのダウンロード</string>
     <string name="proprietary_notice">Magisk ManagerはFOSSであるため、GoogleのプロプライエタリなSafetyNet APIコードを含んでいません。\n\nMagisk ManagerがSafetyNetチェックのための拡張機能 (GoogleApiClientを含む) をダウンロードすることを許可しますか?</string>
-    <string name="setup_done">セットアップ完了。</string>
     <string name="setup_fail">セットアップに失敗しました。</string>
     <string name="env_fix_title">追加のセットアップが必要</string>
     <string name="env_fix_msg">Magiskを正常に機能させるには、お使いのデバイスに追加のセットアップが必要です。Magiskのセットアップ用zipをダウンロードすることになりますが、今すぐ続行しますか？</string>
@@ -136,8 +133,6 @@
     <string name="settings_update_beta">ベータ版</string>
     <string name="settings_update_custom">カスタム</string>
     <string name="settings_update_custom_msg">カスタムURLを入力</string>
-    <string name="settings_boot_format_title">パッチしたBootの出力形式</string>
-    <string name="settings_boot_format_summary">パッチしたBootイメージの出力形式を選択してください。\nfastboot/download modeでインストールするには .img を、ODINでインストールするには .img.tar を選択してください</string>
     <string name="settings_core_only_title">Magiskコアモード</string>
     <string name="settings_core_only_summary">コア機能のみを有効にします。すべてのモジュールが読み込まれなくなります。 MagiskSU、MagiskHide は引き続き有効になります</string>
     <string name="settings_magiskhide_summary">さまざまな検出からMagiskを隠します</string>

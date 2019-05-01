@@ -59,7 +59,6 @@ public class Config {
         public static final String CHECK_UPDATES = "check_update";
         public static final String UPDATE_CHANNEL = "update_channel";
         public static final String CUSTOM_CHANNEL = "custom_channel";
-        public static final String BOOT_FORMAT = "boot_format";
         public static final String LOCALE = "locale";
         public static final String DARK_THEME = "dark_theme";
         public static final String ETAG_KEY = "ETag";
@@ -73,6 +72,7 @@ public class Config {
     }
 
     public static class Value {
+        public static final int DEFAULT_CHANNEL = -1;
         public static final int STABLE_CHANNEL = 0;
         public static final int BETA_CHANNEL = 1;
         public static final int CUSTOM_CHANNEL = 2;
@@ -118,7 +118,7 @@ public class Config {
     public static void initialize() {
         SharedPreferences pref = App.self.prefs;
         SharedPreferences.Editor editor = pref.edit();
-        SuFile config = new SuFile("/data/adb/" + Const.MANAGER_CONFIGS);
+        File config = SuFile.open("/data/adb", Const.MANAGER_CONFIGS);
         if (config.exists()) {
             try {
                 SuFileInputStream is = new SuFileInputStream(config);
@@ -213,7 +213,6 @@ public class Config {
                 return PREF_BOOL;
 
             case Key.CUSTOM_CHANNEL:
-            case Key.BOOT_FORMAT:
             case Key.LOCALE:
             case Key.ETAG_KEY:
                 return PREF_STR;
@@ -316,7 +315,7 @@ public class Config {
         defs.put(Key.SU_AUTO_RESPONSE, Value.SU_PROMPT);
         defs.put(Key.SU_NOTIFICATION, Value.NOTIFICATION_TOAST);
         defs.put(Key.UPDATE_CHANNEL, Utils.isCanary() ?
-                Value.CANARY_DEBUG_CHANNEL : Value.STABLE_CHANNEL);
+                Value.CANARY_DEBUG_CHANNEL : Value.DEFAULT_CHANNEL);
 
         // prefs bool
         defs.put(Key.CHECK_UPDATES, true);
@@ -326,7 +325,6 @@ public class Config {
 
         // prefs string
         defs.put(Key.CUSTOM_CHANNEL, "");
-        defs.put(Key.BOOT_FORMAT, ".img");
         defs.put(Key.LOCALE, "");
         //defs.put(Key.ETAG_KEY, null);
 

@@ -1,11 +1,23 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
+
+kapt {
+    correctErrorTypes = true
+    useBuildCache = true
+    mapDiagnosticLocations = true
+    javacOptions {
+        option("-Xmaxerrs", 1000)
+    }
+}
 
 android {
     defaultConfig {
         applicationId 'com.topjohnwu.magisk'
         vectorDrawables.useSupportLibrary = true
-        versionName rootProject.ext.configProps['appVersion']
-        versionCode rootProject.ext.configProps['appVersionCode'] as Integer
+        versionName configProps['appVersion']
+        versionCode configProps['appVersionCode'] as Integer
         javaCompileOptions {
             annotationProcessorOptions {
                 argument('butterknife.debuggable', 'false')
@@ -25,11 +37,14 @@ dependencies {
     implementation project(':net')
     implementation project(':shared')
     implementation project(':signing')
-    implementation 'ru.noties:markwon:2.0.1'
-    implementation 'com.caverock:androidsvg-aar:1.3'
-    implementation 'org.kamranzafar:jtar:2.3'
+    implementation 'com.github.topjohnwu:jtar:1.0.0'
     implementation 'net.sourceforge.streamsupport:android-retrostreams:1.7.0'
     implementation 'com.github.sevar83:indeterminate-checkbox:1.0.5'
+
+    def markwonVersion = '3.0.0'
+    implementation "ru.noties.markwon:core:${markwonVersion}"
+    implementation "ru.noties.markwon:html:${markwonVersion}"
+    implementation "ru.noties.markwon:image-svg:${markwonVersion}"
 
     def androidXVersion = "1.0.0"
     implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
@@ -38,14 +53,14 @@ dependencies {
     implementation "androidx.recyclerview:recyclerview:${androidXVersion}"
     implementation "androidx.cardview:cardview:${androidXVersion}"
     implementation "com.google.android.material:material:${androidXVersion}"
-    implementation 'androidx.work:work-runtime:2.0.0-rc01'
-    implementation 'androidx.transition:transition:1.0.1'
+    implementation 'androidx.work:work-runtime:2.0.1'
+    implementation 'androidx.transition:transition:1.1.0-beta01'
 
-    def libsuVersion = '2.3.1'
+    def libsuVersion = '2.5.0'
     implementation "com.github.topjohnwu.libsu:core:${libsuVersion}"
     implementation "com.github.topjohnwu.libsu:io:${libsuVersion}"
 
     def butterKnifeVersion = '10.1.0'
     implementation "com.jakewharton:butterknife-runtime:${butterKnifeVersion}"
-    annotationProcessor "com.jakewharton:butterknife-compiler:${butterKnifeVersion}"
+    kapt "com.jakewharton:butterknife-compiler:${butterKnifeVersion}"
 }

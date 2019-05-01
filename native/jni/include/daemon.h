@@ -1,8 +1,4 @@
-/* daemon.h - Utility functions for daemon-client communication
- */
-
-#ifndef _DAEMON_H_
-#define _DAEMON_H_
+#pragma once
 
 #include <pthread.h>
 #include <sys/un.h>
@@ -69,6 +65,7 @@ void boot_complete(int client);
  * Scripting *
  *************/
 
+void exec_script(const char *script);
 void exec_common_script(const char *stage);
 void exec_module_script(const char *stage, const std::vector<std::string> &module_list);
 void migrate_img(const char *img);
@@ -86,4 +83,5 @@ void magiskhide_handler(int client);
 
 void su_daemon_handler(int client, struct ucred *credential);
 
-#endif
+extern int SDK_INT;
+extern bool RECOVERY_MODE;

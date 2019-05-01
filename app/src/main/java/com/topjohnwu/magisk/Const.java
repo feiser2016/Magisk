@@ -25,14 +25,12 @@ public class Const {
         EXTERNAL_PATH.mkdirs();
     }
 
-    public static final String BUSYBOX_PATH = "/sbin/.magisk/busybox";
     public static final String TMP_FOLDER_PATH = "/dev/tmp";
     public static final String MAGISK_LOG = "/cache/magisk.log";
     public static final String MANAGER_CONFIGS = ".tmp.magisk.config";
 
     // Versions
     public static final int UPDATE_SERVICE_VER = 1;
-    public static final int MIN_MODULE_VER = 1500;
     public static final int SNET_EXT_VER = 12;
 
     public static final int USER_ID = Process.myUid() / 100000;
@@ -42,10 +40,8 @@ public class Const {
     }
 
     public static class ID {
-        public static final int UPDATE_SERVICE_ID = 1;
         public static final int FETCH_ZIP = 2;
         public static final int SELECT_BOOT = 3;
-        public static final int ONBOOT_SERVICE_ID = 6;
 
         // notifications
         public static final int MAGISK_UPDATE_NOTIFICATION_ID = 4;
@@ -68,6 +64,7 @@ public class Const {
         public static final String REPO_URL = "https://api.github.com/users/Magisk-Modules-Repo/repos?per_page=100&sort=pushed&page=%d";
         public static final String FILE_URL = "https://raw.githubusercontent.com/Magisk-Modules-Repo/%s/master/%s";
         public static final String ZIP_URL = "https://github.com/Magisk-Modules-Repo/%s/archive/master.zip";
+        public static final String MODULE_INSTALLER = "https://raw.githubusercontent.com/topjohnwu/Magisk/master/scripts/module_installer.sh";
         public static final String PAYPAL_URL = "https://www.paypal.me/topjohnwu";
         public static final String PATREON_URL = "https://www.patreon.com/topjohnwu";
         public static final String TWITTER_URL = "https://twitter.com/topjohnwu";
@@ -82,19 +79,17 @@ public class Const {
         public static final String LINK_KEY = "Link";
         public static final String IF_NONE_MATCH = "If-None-Match";
         // intents
-        public static final String FROM_SPLASH = "splash";
         public static final String OPEN_SECTION = "section";
         public static final String INTENT_SET_NAME = "filename";
         public static final String INTENT_SET_LINK = "link";
         public static final String FLASH_ACTION = "action";
-        public static final String FLASH_SET_BOOT = "boot";
         public static final String BROADCAST_MANAGER_UPDATE = "manager_update";
         public static final String BROADCAST_REBOOT = "reboot";
     }
 
     public static class Value {
         public static final String FLASH_ZIP = "flash";
-        public static final String PATCH_BOOT = "patch";
+        public static final String PATCH_FILE = "patch";
         public static final String FLASH_MAGISK = "magisk";
         public static final String FLASH_INACTIVE_SLOT = "slot";
         public static final String UNINSTALL = "uninstall";

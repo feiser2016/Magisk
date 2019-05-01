@@ -4,10 +4,11 @@ import android.os.SystemClock;
 
 import com.topjohnwu.magisk.Config;
 import com.topjohnwu.magisk.Const;
-import com.topjohnwu.magisk.utils.Topic;
+import com.topjohnwu.magisk.utils.Event;
 import com.topjohnwu.net.Networking;
 import com.topjohnwu.net.Request;
 import com.topjohnwu.net.ResponseListener;
+import com.topjohnwu.superuser.ShellUtils;
 import com.topjohnwu.superuser.internal.UiThreadHandler;
 
 import org.json.JSONException;
@@ -30,7 +31,6 @@ public class CheckUpdates {
             case Config.Value.CANARY_DEBUG_CHANNEL:
                 url = Const.Url.CANARY_DEBUG_URL;
                 break;
-            case Config.Value.STABLE_CHANNEL:
             default:
                 url = Const.Url.STABLE_URL;
                 break;
@@ -39,13 +39,19 @@ public class CheckUpdates {
     }
 
     public static void check() {
-        getRequest().getAsJSONObject(new UpdateListener(null));
+        check(null);
     }
 
-    public static void checkNow(Runnable cb) {
-        JSONObject json = getRequest().execForJSONObject().getResult();
-        if (json != null)
-            new UpdateListener(cb).onResponse(json);
+    public static void check(Runnable cb) {
+        Request request = getRequest();
+        UpdateListener listener = new UpdateListener(cb);
+        if (ShellUtils.onMainThread()) {
+            request.getAsJSONObject(listener);
+        } else {
+            JSONObject json = request.execForJSONObject().getResult();
+            if (json != null)
+                listener.onResponse(json);
+        }
     }
 
     private static class UpdateListener implements ResponseListener<JSONObject> {
@@ -89,8 +95,20 @@ public class CheckUpdates {
         @Override
         public void onResponse(JSONObject json) {
             JSONObject magisk = getJson(json, "magisk");
-            Config.remoteMagiskVersionString = getString(magisk, "version", null);
             Config.remoteMagiskVersionCode = getInt(magisk, "versionCode", -1);
+
+            if ((int) Config.get(Config.Key.UPDATE_CHANNEL) == Config.Value.DEFAULT_CHANNEL) {
+                if (Config.magiskVersionCode > Config.remoteMagiskVersionCode) {
+                    // If we are newer than current stable channel, switch to beta
+                    Config.set(Config.Key.UPDATE_CHANNEL, Config.Value.BETA_CHANNEL);
+                    check(cb);
+                    return;
+                } else {
+                    Config.set(Config.Key.UPDATE_CHANNEL, Config.Value.STABLE_CHANNEL);
+                }
+            }
+
+            Config.remoteMagiskVersionString = getString(magisk, "version", null);
             Config.magiskLink = getString(magisk, "link", null);
             Config.magiskNoteLink = getString(magisk, "note", null);
             Config.magiskMD5 = getString(magisk, "md5", null);
@@ -104,7 +122,7 @@ public class CheckUpdates {
             JSONObject uninstaller = getJson(json, "uninstaller");
             Config.uninstallerLink = getString(uninstaller, "link", null);
 
-            UiThreadHandler.handler.postAtTime(() -> Topic.publish(Topic.UPDATE_CHECK_DONE),
+            UiThreadHandler.handler.postAtTime(() -> Event.trigger(Event.UPDATE_CHECK_DONE),
                     start + 1000  /* Add artificial delay to let UI behave correctly */);
 
             if (cb != null)
