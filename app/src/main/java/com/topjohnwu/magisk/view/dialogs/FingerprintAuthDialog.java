@@ -11,20 +11,23 @@ import android.os.Build;
 import android.view.Gravity;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
-
 import com.topjohnwu.magisk.R;
 import com.topjohnwu.magisk.utils.FingerprintHelper;
 import com.topjohnwu.magisk.utils.Utils;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+
 @TargetApi(Build.VERSION_CODES.M)
 public class FingerprintAuthDialog extends CustomAlertDialog {
 
-    private Runnable callback;
+    private final Runnable callback;
+    @Nullable
+    private Runnable failureCallback;
     private DialogFingerprintHelper helper;
 
-    public FingerprintAuthDialog(@NonNull Activity activity, Runnable onSuccess) {
+    public FingerprintAuthDialog(@NonNull Activity activity, @NonNull Runnable onSuccess) {
         super(activity);
         callback = onSuccess;
         Drawable fingerprint = activity.getResources().getDrawable(R.drawable.ic_fingerprint);
@@ -33,15 +36,30 @@ public class FingerprintAuthDialog extends CustomAlertDialog {
         TypedArray ta = theme.obtainStyledAttributes(new int[] {R.attr.imageColorTint});
         fingerprint.setTint(ta.getColor(0, Color.GRAY));
         ta.recycle();
-        vh.messageView.setCompoundDrawables(null, null, null, fingerprint);
-        vh.messageView.setCompoundDrawablePadding(Utils.dpInPx(20));
-        vh.messageView.setGravity(Gravity.CENTER);
+        binding.message.setCompoundDrawables(null, null, null, fingerprint);
+        binding.message.setCompoundDrawablePadding(Utils.dpInPx(20));
+        binding.message.setGravity(Gravity.CENTER);
         setMessage(R.string.auth_fingerprint);
-        setNegativeButton(R.string.close, (d, w) -> helper.cancel());
-        setOnCancelListener(d -> helper.cancel());
+        setNegativeButton(R.string.close, (d, w) -> {
+            helper.cancel();
+            if (failureCallback != null) {
+                failureCallback.run();
+            }
+        });
+        setOnCancelListener(d -> {
+            helper.cancel();
+            if (failureCallback != null) {
+                failureCallback.run();
+            }
+        });
         try {
             helper = new DialogFingerprintHelper();
         } catch (Exception ignored) {}
+    }
+
+    public FingerprintAuthDialog(@NonNull Activity activity, @NonNull Runnable onSuccess, @NonNull Runnable onFailure) {
+        this(activity, onSuccess);
+        failureCallback = onFailure;
     }
 
     @Override
@@ -63,20 +81,20 @@ public class FingerprintAuthDialog extends CustomAlertDialog {
 
         @Override
         public void onAuthenticationError(int errorCode, CharSequence errString) {
-            vh.messageView.setTextColor(Color.RED);
-            vh.messageView.setText(errString);
+            binding.message.setTextColor(Color.RED);
+            binding.message.setText(errString);
         }
 
         @Override
         public void onAuthenticationHelp(int helpCode, CharSequence helpString) {
-            vh.messageView.setTextColor(Color.RED);
-            vh.messageView.setText(helpString);
+            binding.message.setTextColor(Color.RED);
+            binding.message.setText(helpString);
         }
 
         @Override
         public void onAuthenticationFailed() {
-            vh.messageView.setTextColor(Color.RED);
-            vh.messageView.setText(R.string.auth_fail);
+            binding.message.setTextColor(Color.RED);
+            binding.message.setText(R.string.auth_fail);
         }
 
         @Override

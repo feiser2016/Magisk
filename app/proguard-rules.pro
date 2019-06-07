@@ -16,17 +16,16 @@
 #   public *;
 #}
 
-# BouncyCastle
--keep,allowoptimization class org.bouncycastle.jcajce.provider.asymmetric.rsa.**SHA1** { *; }
--keep,allowoptimization class org.bouncycastle.jcajce.provider.asymmetric.RSA** { *; }
--keep,allowoptimization class org.bouncycastle.jcajce.provider.digest.SHA1** { *; }
--dontwarn javax.naming.**
-
 # Snet
 -keepclassmembers class com.topjohnwu.magisk.utils.ISafetyNetHelper { *; }
 -keep,allowobfuscation interface com.topjohnwu.magisk.utils.ISafetyNetHelper$Callback
 -keepclassmembers class * implements com.topjohnwu.magisk.utils.ISafetyNetHelper$Callback {
   void onResponse(int);
+}
+
+# Keep all fragment constructors
+-keepclassmembers class * extends androidx.fragment.app.Fragment {
+  public <init>(...);
 }
 
 # DelegateWorker
@@ -35,13 +34,8 @@
 # BootSigner
 -keepclassmembers class com.topjohnwu.signing.BootSigner { *; }
 
-# SVG
--dontwarn com.caverock.androidsvg.SVGAndroidRenderer
-
-# RetroStreams
--dontwarn java9.**
-
 # Strip logging
+-assumenosideeffects class timber.log.Timber.Tree { *; }
 -assumenosideeffects class com.topjohnwu.magisk.utils.Logger {
   public *** debug(...);
 }

@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/mount.h>
 
 #include <magisk.h>
 #include <daemon.h>
@@ -83,7 +84,7 @@ static void database_check(su_info *info) {
 	}
 
 	if (uid > 0)
-		get_uid_policy(uid, info->access);
+		get_uid_policy(info->access, uid);
 
 	// We need to check our manager
 	if (info->access.log || info->access.notify)
@@ -308,14 +309,13 @@ void su_daemon_handler(int client, struct ucred *credential) {
 			break;
 		case NAMESPACE_MODE_REQUESTER:
 			LOGD("su: use namespace of pid=[%d]\n", ctx.pid);
-			if (switch_mnt_ns(ctx.pid)) {
-				LOGD("su: setns failed, fallback to isolated\n");
-				xunshare(CLONE_NEWNS);
-			}
+			if (switch_mnt_ns(ctx.pid))
+				LOGD("su: setns failed, fallback to global\n");
 			break;
 		case NAMESPACE_MODE_ISOLATE:
 			LOGD("su: use new isolated namespace\n");
 			xunshare(CLONE_NEWNS);
+			xmount(nullptr, "/", nullptr, MS_PRIVATE | MS_REC, nullptr);
 			break;
 	}
 
