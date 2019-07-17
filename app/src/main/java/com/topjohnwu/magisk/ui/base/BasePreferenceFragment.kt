@@ -12,20 +12,14 @@ import androidx.core.view.isVisible
 import androidx.preference.*
 import androidx.recyclerview.widget.RecyclerView
 import com.topjohnwu.magisk.App
-import com.topjohnwu.magisk.Config
-import com.topjohnwu.magisk.KConfig
 import com.topjohnwu.magisk.R
-import com.topjohnwu.magisk.data.database.RepoDatabaseHelper
-import com.topjohnwu.magisk.data.repository.SettingRepository
 import org.koin.android.ext.android.inject
 
 abstract class BasePreferenceFragment : PreferenceFragmentCompat(),
     SharedPreferences.OnSharedPreferenceChangeListener {
 
-    protected val repoDatabase: RepoDatabaseHelper by inject()
     protected val prefs: SharedPreferences by inject()
     protected val app: App by inject()
-    protected val settingRepo: SettingRepository by inject()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -67,19 +61,7 @@ abstract class BasePreferenceFragment : PreferenceFragmentCompat(),
             view.setPadding(0, view.paddingTop, view.paddingRight, view.paddingBottom)
     }
 
-    protected fun setCustomUpdateChannel(userRepo: String) {
-        KConfig.customUpdateChannel = userRepo
-    }
-
-    protected fun getChannelCompat(channel: Int): KConfig.UpdateChannel {
-        return when (channel) {
-            Config.Value.STABLE_CHANNEL,
-            Config.Value.DEFAULT_CHANNEL -> KConfig.UpdateChannel.STABLE
-            Config.Value.BETA_CHANNEL -> KConfig.UpdateChannel.BETA
-            Config.Value.CANARY_CHANNEL -> KConfig.UpdateChannel.CANARY
-            Config.Value.CANARY_DEBUG_CHANNEL -> KConfig.UpdateChannel.CANARY_DEBUG
-            Config.Value.CUSTOM_CHANNEL -> KConfig.UpdateChannel.CUSTOM
-            else -> KConfig.updateChannel
-        }
+    protected fun <T: Preference> findPref(key: CharSequence): T {
+        return findPreference(key) as T
     }
 }

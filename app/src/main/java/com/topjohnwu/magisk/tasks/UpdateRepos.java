@@ -18,7 +18,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.net.HttpURLConnection;
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -36,12 +35,6 @@ import io.reactivex.Single;
 
 @Deprecated
 public class UpdateRepos {
-    private static final DateFormat DATE_FORMAT;
-
-    static {
-        DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
-        DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
-    }
 
     @NonNull
     private final RepoDatabaseHelper repoDB;
@@ -70,14 +63,25 @@ public class UpdateRepos {
         }
     }
 
+    /**
+     * Static instance of (Simple)DateFormat is not threadsafe so in order to make it safe it needs
+     * to be created beforehand on the same thread where it'll be used.
+     * See https://stackoverflow.com/a/18383395
+     */
+    private static SimpleDateFormat getDateFormat() {
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+        format.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return format;
+    }
+
     /* We sort repos by last push, which means that we only need to check whether the
      * first page is updated to determine whether the online repo database is changed
      */
     private boolean parsePage(int page) {
-        Request req = Networking.get(Utils.fmt(Const.Url.REPO_URL, page + 1));
+        Request req = Networking.get(Utils.INSTANCE.fmt(Const.Url.REPO_URL, page + 1));
         if (page == 0) {
-            String etag = Config.get(Config.Key.ETAG_KEY);
-            if (etag != null)
+            String etag = Config.getEtagKey();
+            if (!etag.isEmpty())
                 req.addHeaders(Const.Key.IF_NONE_MATCH, etag);
         }
         Request.Result<JSONArray> res = req.execForJSONArray();
@@ -94,10 +98,12 @@ public class UpdateRepos {
             return true;
 
         try {
+            SimpleDateFormat dateFormat = getDateFormat();
+
             for (int i = 0; i < res.getResult().length(); i++) {
                 JSONObject rawRepo = res.getResult().getJSONObject(i);
                 String id = rawRepo.getString("name");
-                Date date = DATE_FORMAT.parse(rawRepo.getString("pushed_at"));
+                Date date = dateFormat.parse(rawRepo.getString("pushed_at"));
                 moduleQueue.offer(new Pair<>(id, date));
             }
         } catch (JSONException | ParseException e) {
@@ -110,7 +116,7 @@ public class UpdateRepos {
             String etag = res.getConnection().getHeaderField(Config.Key.ETAG_KEY);
             if (etag != null) {
                 etag = etag.substring(etag.indexOf('\"'), etag.lastIndexOf('\"') + 1);
-                Config.set(Config.Key.ETAG_KEY, etag);
+                Config.setEtagKey(etag);
             }
         }
 

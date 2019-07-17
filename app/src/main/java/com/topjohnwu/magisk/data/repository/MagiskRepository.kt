@@ -4,20 +4,17 @@ import android.content.Context
 import android.content.pm.PackageManager
 import com.topjohnwu.magisk.App
 import com.topjohnwu.magisk.Config
-import com.topjohnwu.magisk.KConfig
+import com.topjohnwu.magisk.Info
 import com.topjohnwu.magisk.data.database.base.su
-import com.topjohnwu.magisk.data.database.base.suRaw
 import com.topjohnwu.magisk.data.network.GithubRawApiServices
 import com.topjohnwu.magisk.model.entity.HideAppInfo
 import com.topjohnwu.magisk.model.entity.HideTarget
-import com.topjohnwu.magisk.model.entity.Version
 import com.topjohnwu.magisk.utils.Utils
 import com.topjohnwu.magisk.utils.inject
 import com.topjohnwu.magisk.utils.toSingle
 import com.topjohnwu.magisk.utils.writeToFile
 import com.topjohnwu.superuser.Shell
 import io.reactivex.Single
-import io.reactivex.functions.BiFunction
 
 class MagiskRepository(
     private val context: Context,
@@ -25,55 +22,42 @@ class MagiskRepository(
     private val packageManager: PackageManager
 ) {
 
-    fun fetchMagisk() = fetchConfig()
+    fun fetchMagisk() = fetchUpdate()
         .flatMap { apiRaw.fetchFile(it.magisk.link) }
         .map { it.writeToFile(context, FILE_MAGISK_ZIP) }
 
-    fun fetchManager() = fetchConfig()
+    fun fetchManager() = fetchUpdate()
         .flatMap { apiRaw.fetchFile(it.app.link) }
         .map { it.writeToFile(context, FILE_MAGISK_APK) }
 
-    fun fetchUninstaller() = fetchConfig()
+    fun fetchUninstaller() = fetchUpdate()
         .flatMap { apiRaw.fetchFile(it.uninstaller.link) }
         .map { it.writeToFile(context, FILE_UNINSTALLER_ZIP) }
 
-    fun fetchSafetynet() = apiRaw
-        .fetchSafetynet()
-        .map { it.writeToFile(context, FILE_SAFETY_NET_APK) }
+    fun fetchSafetynet() = apiRaw.fetchSafetynet()
 
     fun fetchBootctl() = apiRaw
         .fetchBootctl()
         .map { it.writeToFile(context, FILE_BOOTCTL_SH) }
 
 
-    fun fetchConfig() = when (KConfig.updateChannel) {
-        KConfig.UpdateChannel.STABLE -> apiRaw.fetchConfig()
-        KConfig.UpdateChannel.BETA -> apiRaw.fetchBetaConfig()
-        KConfig.UpdateChannel.CANARY -> apiRaw.fetchCanaryConfig()
-        KConfig.UpdateChannel.CANARY_DEBUG -> apiRaw.fetchCanaryDebugConfig()
-        KConfig.UpdateChannel.CUSTOM -> apiRaw.fetchCustomConfig(KConfig.customUpdateChannel)
-    }
-    .doOnSuccess {
-        Config.remoteMagiskVersionCode = it.magisk.versionCode.toIntOrNull() ?: -1
-        Config.magiskLink = it.magisk.link
-        Config.magiskNoteLink = it.magisk.note
-        Config.magiskMD5 = it.magisk.hash
-        Config.remoteManagerVersionCode = it.app.versionCode.toIntOrNull() ?: -1
-        Config.remoteManagerVersionString = it.app.version
-        Config.managerLink = it.app.link
-        Config.managerNoteLink = it.app.note
-        Config.uninstallerLink = it.uninstaller.link
-    }
-
-
-    fun fetchMagiskVersion(): Single<Version> = Single.zip(
-        fetchMagiskVersionName(),
-        fetchMagiskVersionCode(),
-        BiFunction { versionName, versionCode ->
-            Version(versionName, versionCode)
+    fun fetchUpdate() = when (Config.updateChannel) {
+        Config.Value.DEFAULT_CHANNEL, Config.Value.STABLE_CHANNEL -> apiRaw.fetchStableUpdate()
+        Config.Value.BETA_CHANNEL -> apiRaw.fetchBetaUpdate()
+        Config.Value.CANARY_CHANNEL -> apiRaw.fetchCanaryUpdate()
+        Config.Value.CANARY_DEBUG_CHANNEL -> apiRaw.fetchCanaryDebugUpdate()
+        Config.Value.CUSTOM_CHANNEL -> apiRaw.fetchCustomUpdate(Config.customChannelUrl)
+        else -> throw IllegalArgumentException()
+    }.flatMap {
+        // If remote version is lower than current installed, try switching to beta
+        if (it.magisk.versionCode < Info.magiskVersionCode
+                && Config.updateChannel == Config.Value.DEFAULT_CHANNEL) {
+            Config.updateChannel = Config.Value.BETA_CHANNEL
+            apiRaw.fetchBetaUpdate()
+        } else {
+            Single.just(it)
         }
-    )
-
+    }.map { Info.remote = it; it }
 
     fun fetchApps() =
         Single.fromCallable { packageManager.getInstalledApplications(0) }
@@ -92,16 +76,6 @@ class MagiskRepository(
         .flattenAsFlowable { it }
         .map { HideTarget(it) }
         .toList()
-
-    private fun fetchMagiskVersionName() = "magisk -v".suRaw()
-        .map { it.first() }
-        .map { it.substring(0 until it.indexOf(":")) }
-        .onErrorReturn { "Unknown" }
-
-    private fun fetchMagiskVersionCode() = "magisk -V".suRaw()
-        .map { it.first() }
-        .map { it.toIntOrNull() ?: -1 }
-        .onErrorReturn { -1 }
 
     fun toggleHide(isEnabled: Boolean, packageName: String, process: String) =
         "magiskhide --%s %s %s".format(isEnabled.state, packageName, process).su().ignoreElement()
