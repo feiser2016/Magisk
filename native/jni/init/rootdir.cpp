@@ -86,7 +86,7 @@ static void load_overlay_rc(int dirfd) {
 	rewinddir(dir);
 }
 
-void RootFSInit::setup_rootfs() {
+void RootFSBase::setup_rootfs() {
 	if (patch_sepolicy()) {
 		char *addr;
 		size_t size;
@@ -149,7 +149,7 @@ void SARCompatInit::setup_rootfs() {
 	clone_dir(system_root, root, false);
 	close(system_root);
 
-	RootFSInit::setup_rootfs();
+	RootFSBase::setup_rootfs();
 }
 
 bool MagiskInit::patch_sepolicy(const char *file) {
@@ -225,12 +225,13 @@ static void sbin_overlay(const raw_data &self, const raw_data &config) {
 	xsymlink("./magiskinit", "/sbin/supolicy");
 }
 
-#define ROOTOVL MAGISKTMP "/rootdir"
 #define ROOTMIR MIRRDIR "/system_root"
 #define ROOTBLK BLOCKDIR "/system_root"
 #define MONOPOLICY  "/sepolicy"
 #define PATCHPOLICY "/sbin/.se"
 #define LIBSELINUX  "/system/" LIBNAME "/libselinux.so"
+
+static string mount_list;
 
 static void magic_mount(int dirfd, const string &path) {
 	DIR *dir = xfdopendir(dirfd);
@@ -248,12 +249,14 @@ static void magic_mount(int dirfd, const string &path) {
 				string src = ROOTOVL + dest;
 				LOGD("Mount [%s] -> [%s]\n", src.data(), dest.data());
 				xmount(src.data(), dest.data(), nullptr, MS_BIND, nullptr);
+				mount_list += dest;
+				mount_list += '\n';
 			}
 		}
 	}
 }
 
-void SARCommon::patch_rootdir() {
+void SARBase::patch_rootdir() {
 	sbin_overlay(self, config);
 
 	// Mount system_root mirror
@@ -376,28 +379,12 @@ void SARCommon::patch_rootdir() {
 	src = xopen(ROOTOVL, O_RDONLY | O_CLOEXEC);
 	magic_mount(src, "");
 	close(src);
+	dest = xopen(ROOTMNT, O_WRONLY | O_CREAT | O_CLOEXEC);
+	write(dest, mount_list.data(), mount_list.length());
+	close(dest);
 }
 
-#define FSR "/first_stage_ramdisk"
-
-void FirstStageInit::prepare() {
-	// Find fstab
-	DIR *dir = xopendir(FSR);
-	if (!dir)
-		return;
-	dirent *de;
-	string fstab(FSR "/");
-	while ((de = readdir(dir))) {
-		if (strstr(de->d_name, "fstab")) {
-			fstab += de->d_name;
-			break;
-		}
-	}
-	closedir(dir);
-	if (fstab.length() == sizeof(FSR))
-		return;
-
-	// Patch fstab
+static void patch_fstab(const string &fstab) {
 	string patched = fstab + ".p";
 	FILE *fp = xfopen(patched.data(), "we");
 	file_readline(fstab.data(), [=](string_view l) -> bool {
@@ -431,6 +418,26 @@ void FirstStageInit::prepare() {
 	// Replace old fstab
 	clone_attr(fstab.data(), patched.data());
 	rename(patched.data(), fstab.data());
+}
+
+#define FSR "/first_stage_ramdisk"
+
+void ABFirstStageInit::prepare() {
+	DIR *dir = xopendir(FSR);
+	if (!dir)
+		return;
+	string fstab(FSR "/");
+	for (dirent *de; (de = readdir(dir));) {
+		if (strstr(de->d_name, "fstab")) {
+			fstab += de->d_name;
+			break;
+		}
+	}
+	closedir(dir);
+	if (fstab.length() == sizeof(FSR))
+		return;
+
+	patch_fstab(fstab);
 
 	// Move stuffs for next stage
 	xmkdir(FSR "/system", 0755);
@@ -440,6 +447,23 @@ void FirstStageInit::prepare() {
 	xmkdir(FSR "/.backup", 0);
 	rename("/.backup/.magisk", FSR "/.backup/.magisk");
 	rename("/overlay.d", FSR "/overlay.d");
+}
+
+void AFirstStageInit::prepare() {
+	DIR *dir = xopendir("/");
+	for (dirent *de; (de = readdir(dir));) {
+		if (strstr(de->d_name, "fstab")) {
+			patch_fstab(de->d_name);
+			break;
+		}
+	}
+	closedir(dir);
+
+	// Move stuffs for next stage
+	xmkdir("/system", 0755);
+	xmkdir("/system/bin", 0755);
+	rename("/init", "/system/bin/init");
+	rename("/.backup/init", "/init");
 }
 
 #ifdef MAGISK_DEBUG

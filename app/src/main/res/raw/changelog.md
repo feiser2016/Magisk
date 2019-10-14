@@ -1,3 +1,4 @@
-# v7.3.2
-- Fix potential crash in superuser fragment
-- Preserve searched state in repo fragment
+# v7.3.5
+- Sort installed modules by name
+- Better pre-5.0 support
+- Fix potential issues when patching tar files

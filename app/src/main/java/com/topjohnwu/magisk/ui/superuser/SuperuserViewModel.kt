@@ -2,23 +2,22 @@ package com.topjohnwu.magisk.ui.superuser
 
 import android.content.pm.PackageManager
 import android.content.res.Resources
-import com.skoumal.teanity.databinding.ComparableRvItem
-import com.skoumal.teanity.extensions.applySchedulers
-import com.skoumal.teanity.extensions.subscribeK
-import com.skoumal.teanity.rxbus.RxBus
-import com.skoumal.teanity.util.DiffObservableList
-import com.skoumal.teanity.viewevents.SnackbarEvent
 import com.topjohnwu.magisk.BR
 import com.topjohnwu.magisk.R
-import com.topjohnwu.magisk.data.repository.AppRepository
+import com.topjohnwu.magisk.base.viewmodel.BaseViewModel
+import com.topjohnwu.magisk.data.database.PolicyDao
+import com.topjohnwu.magisk.databinding.ComparableRvItem
+import com.topjohnwu.magisk.extensions.applySchedulers
+import com.topjohnwu.magisk.extensions.subscribeK
+import com.topjohnwu.magisk.extensions.toggle
 import com.topjohnwu.magisk.model.entity.MagiskPolicy
-import com.topjohnwu.magisk.model.entity.Policy
 import com.topjohnwu.magisk.model.entity.recycler.PolicyRvItem
 import com.topjohnwu.magisk.model.events.PolicyEnableEvent
 import com.topjohnwu.magisk.model.events.PolicyUpdateEvent
-import com.topjohnwu.magisk.ui.base.MagiskViewModel
+import com.topjohnwu.magisk.model.events.SnackbarEvent
+import com.topjohnwu.magisk.utils.DiffObservableList
 import com.topjohnwu.magisk.utils.FingerprintHelper
-import com.topjohnwu.magisk.utils.toggle
+import com.topjohnwu.magisk.utils.RxBus
 import com.topjohnwu.magisk.view.dialogs.CustomAlertDialog
 import com.topjohnwu.magisk.view.dialogs.FingerprintAuthDialog
 import io.reactivex.Single
@@ -26,11 +25,11 @@ import io.reactivex.disposables.Disposable
 import me.tatarka.bindingcollectionadapter2.ItemBinding
 
 class SuperuserViewModel(
-    private val appRepo: AppRepository,
+    private val policyDB: PolicyDao,
     private val packageManager: PackageManager,
     private val resources: Resources,
     rxBus: RxBus
-) : MagiskViewModel() {
+) : BaseViewModel() {
 
     val items = DiffObservableList(ComparableRvItem.callback)
     val itemBinding = ItemBinding.of<ComparableRvItem<*>> { itemBinding, _, item ->
@@ -54,7 +53,7 @@ class SuperuserViewModel(
 
     fun updatePolicies() {
         if (fetchTask?.isDisposed?.not() == true) return
-        fetchTask = appRepo.fetchAll()
+        fetchTask = policyDB.fetchAll()
             .flattenAsFlowable { it }
             .map { PolicyRvItem(it, it.applicationInfo.loadIcon(packageManager)) }
             .toList()
@@ -118,7 +117,7 @@ class SuperuserViewModel(
             val app = item.item.copy(policy = if (enable) MagiskPolicy.ALLOW else MagiskPolicy.DENY)
 
             updatePolicy(app)
-                .map { it.policy == Policy.ALLOW }
+                .map { it.policy == MagiskPolicy.ALLOW }
                 .subscribeK {
                     val textId = if (it) R.string.su_snack_grant else R.string.su_snack_deny
                     val text = resources.getString(textId).format(item.item.appName)
@@ -140,9 +139,9 @@ class SuperuserViewModel(
     }
 
     private fun updatePolicy(policy: MagiskPolicy) =
-        appRepo.update(policy).andThen(Single.just(policy))
+        policyDB.update(policy).andThen(Single.just(policy))
 
     private fun deletePolicy(policy: MagiskPolicy) =
-        appRepo.delete(policy.uid).andThen(Single.just(policy))
+        policyDB.delete(policy.uid).andThen(Single.just(policy))
 
 }

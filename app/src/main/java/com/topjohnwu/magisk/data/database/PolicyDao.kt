@@ -4,10 +4,10 @@ import android.content.Context
 import android.content.pm.PackageManager
 import com.topjohnwu.magisk.Const
 import com.topjohnwu.magisk.data.database.base.*
+import com.topjohnwu.magisk.extensions.now
 import com.topjohnwu.magisk.model.entity.MagiskPolicy
 import com.topjohnwu.magisk.model.entity.toMap
 import com.topjohnwu.magisk.model.entity.toPolicy
-import com.topjohnwu.magisk.utils.now
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -62,20 +62,14 @@ class PolicyDao(
 
 
     private fun Map<String, String>.toPolicySafe(): MagiskPolicy? {
-        val taskResult = runCatching { toPolicy(context.packageManager) }
-        val result = taskResult.getOrNull()
-        val exception = taskResult.exceptionOrNull()
-
-        Timber.e(exception)
-
-        when (exception) {
-            is PackageManager.NameNotFoundException -> {
+        return runCatching { toPolicy(context.packageManager) }.getOrElse {
+            Timber.e(it)
+            if (it is PackageManager.NameNotFoundException) {
                 val uid = getOrElse("uid") { null } ?: return null
                 delete(uid).subscribe()
             }
+            null
         }
-
-        return result
     }
 
 }

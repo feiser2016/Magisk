@@ -1,6 +1,7 @@
 package com.topjohnwu.magisk.model.entity
 
-import com.squareup.moshi.Json
+import android.os.Parcelable
+import kotlinx.android.parcel.Parcelize
 import se.ansman.kotshi.JsonSerializable
 
 @JsonSerializable
@@ -21,13 +22,14 @@ data class MagiskJson(
     val versionCode: Int = -1,
     val link: String = "",
     val note: String = "",
-    @Json(name = "md5") val hash: String = ""
+    val md5: String = ""
 )
 
+@Parcelize
 @JsonSerializable
 data class ManagerJson(
     val version: String = "",
     val versionCode: Int = -1,
     val link: String = "",
     val note: String = ""
-)
+) : Parcelable

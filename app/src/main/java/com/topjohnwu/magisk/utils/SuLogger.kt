@@ -7,10 +7,10 @@ import android.os.Process
 import android.widget.Toast
 import com.topjohnwu.magisk.Config
 import com.topjohnwu.magisk.R
-import com.topjohnwu.magisk.data.repository.AppRepository
+import com.topjohnwu.magisk.data.database.PolicyDao
 import com.topjohnwu.magisk.data.repository.LogRepository
+import com.topjohnwu.magisk.extensions.inject
 import com.topjohnwu.magisk.model.entity.MagiskPolicy
-import com.topjohnwu.magisk.model.entity.Policy
 import com.topjohnwu.magisk.model.entity.toLog
 import com.topjohnwu.magisk.model.entity.toPolicy
 import java.util.*
@@ -19,7 +19,6 @@ object SuLogger {
 
     private val context: Context by inject()
 
-    @JvmStatic
     fun handleLogs(intent: Intent) {
 
         val fromUid = intent.getIntExtra("from.uid", -1)
@@ -37,8 +36,8 @@ object SuLogger {
             }.getOrElse { return }
         } else {
             // Doesn't report whether notify or not, check database ourselves
-            val appRepo: AppRepository by inject()
-            val policy = appRepo.fetch(fromUid).blockingGet() ?: return
+            val policyDB: PolicyDao by inject()
+            val policy = policyDB.fetch(fromUid).blockingGet() ?: return
             notify = policy.notification
             policy
         }.copy(policy = data.getInt("policy", -1))
@@ -71,7 +70,7 @@ object SuLogger {
         if (policy.notification && Config.suNotification == Config.Value.NOTIFICATION_TOAST) {
             Utils.toast(
                 context.getString(
-                    if (policy.policy == Policy.ALLOW)
+                    if (policy.policy == MagiskPolicy.ALLOW)
                         R.string.su_allow_toast
                     else
                         R.string.su_deny_toast, policy.appName

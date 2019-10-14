@@ -1,19 +1,23 @@
 package com.topjohnwu.magisk.ui
 
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import com.topjohnwu.magisk.*
-import com.topjohnwu.magisk.data.database.SettingsDao
 import com.topjohnwu.magisk.utils.Utils
+import com.topjohnwu.magisk.utils.wrap
 import com.topjohnwu.magisk.view.Notifications
 import com.topjohnwu.magisk.view.Shortcuts
 import com.topjohnwu.superuser.Shell
-import org.koin.android.ext.android.get
 
-open class SplashActivity : AppCompatActivity() {
+open class SplashActivity : Activity() {
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base.wrap())
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,7 +39,7 @@ open class SplashActivity : AppCompatActivity() {
     private fun initAndStart() {
         val pkg = Config.suManager
         if (Config.suManager.isNotEmpty() && packageName == BuildConfig.APPLICATION_ID) {
-            get<SettingsDao>().delete(Config.Key.SU_MANAGER)
+            Config.suManager = ""
             Shell.su("pm uninstall $pkg").submit()
         }
         if (TextUtils.equals(pkg, packageName)) {
@@ -53,7 +57,7 @@ open class SplashActivity : AppCompatActivity() {
         Notifications.setup(this)
 
         // Schedule periodic update checks
-        Utils.scheduleUpdateCheck()
+        Utils.scheduleUpdateCheck(this)
 
         // Setup shortcuts
         Shortcuts.setup(this)

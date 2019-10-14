@@ -5,23 +5,24 @@ import android.os.Build
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.Window
-import com.skoumal.teanity.viewevents.ViewEvent
 import com.topjohnwu.magisk.R
+import com.topjohnwu.magisk.base.BaseActivity
 import com.topjohnwu.magisk.databinding.ActivityRequestBinding
-import com.topjohnwu.magisk.model.entity.Policy
+import com.topjohnwu.magisk.model.entity.MagiskPolicy
 import com.topjohnwu.magisk.model.events.DieEvent
+import com.topjohnwu.magisk.model.events.ViewEvent
 import com.topjohnwu.magisk.model.receiver.GeneralReceiver
-import com.topjohnwu.magisk.ui.base.MagiskActivity
 import com.topjohnwu.magisk.utils.SuLogger
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
-open class SuRequestActivity : MagiskActivity<SuRequestViewModel, ActivityRequestBinding>() {
+open class SuRequestActivity : BaseActivity<SuRequestViewModel, ActivityRequestBinding>() {
 
     override val layoutRes: Int = R.layout.activity_request
+    override val themeRes: Int = R.style.MagiskTheme_SU
     override val viewModel: SuRequestViewModel by viewModel()
 
     override fun onBackPressed() {
-        viewModel.handler?.handleAction(Policy.DENY, -1)
+        viewModel.handler?.handleAction(MagiskPolicy.DENY, -1)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
